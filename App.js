@@ -2,21 +2,15 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.TimeboxScopedApp',
     componentCls: 'app',
     scopeType: 'iteration',
-    _allowedScheduleStates:[],
     _allowedStates:[],
+    _tasks:null,
     comboboxConfig: {
         fieldLabel: 'Select iteration:',
         labelWidth: 100,
         width: 300
     },
     onScopeChange: function() {
-        this._getDefectModel().then({
-            success: this._getScheduleStateAllowedValues,
-            scope:this
-        }).then({
-            success: this._getTaskModel,
-            scope:this
-        }).then ({
+        this._getTaskModel().then({
             success: this._getStateAllowedValues,
             scope:this
         }).then({
@@ -25,39 +19,11 @@ Ext.define('CustomApp', {
          });
     },
     
-    _getDefectModel:function(){
-        return Rally.data.ModelFactory.getModel({
-            type:'Defect'
-        });
-    },
-    
-    _getTaskModel:function(allowedScheduleStates){
-        this._allowedScheduleStates = allowedScheduleStates;
+    _getTaskModel:function(){
         console.log(this._allowedScheduleStates);
         return Rally.data.ModelFactory.getModel({
             type:'Task'
         });
-    },
-    
-    _getScheduleStateAllowedValues:function(model){
-        var deferred = Ext.create('Deft.Deferred');
-        var allowedScheduleStateValues = [];
-        model.getField('ScheduleState').getAllowedValueStore().load({
-            callback: function(records,operation,success){
-                Ext.Array.each(records,function(allowedValue){
-                    allowedScheduleStateValues.push(allowedValue.get('StringValue'));
-                });
-                if(success){
-                    deferred.resolve(allowedScheduleStateValues);
-                }
-                else{
-                    deferred.reject();
-                }
-
-            }
-        }) ;
-        return deferred.promise;
-        
     },
     
     _getStateAllowedValues:function(model){
@@ -86,7 +52,7 @@ Ext.define('CustomApp', {
         console.log(this._allowedStates);
         Ext.create('Rally.data.wsapi.Store', {
                 model: 'Task',
-                fetch: ['ObjectID', 'FormattedID', 'Name', 'State', 'Owner', 'WorkProduct', 'Estimate', 'Actuals', 'TimeSpent','Blocked','Project','ScheduleState'],
+                fetch: ['ObjectID', 'FormattedID', 'Name', 'State', 'Owner', 'WorkProduct', 'Estimate', 'Actuals','Blocked','ScheduleState'],
                 autoLoad: true,
                 filters: this.getContext().getTimeboxScope().getQueryFilter(),
                 listeners: {
@@ -137,31 +103,27 @@ Ext.define('CustomApp', {
                         var artifactState = record.get('ScheduleState');
                         var artifactFid = record.get('FormattedID');
                         var taskRef     = task.get('_ref');
-                        var taskOid     = task.get('ObjectID');
                         var taskFid     = task.get('FormattedID');
                         var taskEstimate = task.get('Estimate');
                         var taskActuals = task.get('Actuals');
-                        //var taskTimespent = task.get('TimeSpent');
+                        var blocked = task.get('Blocked');
                         var taskName    = task.get('Name');
-                        var blocked     = task.get('Blocked');
                         var taskState   = task.get('State');
                         var taskOwner       = (task.get('Owner')) ? task.get('Owner')._refObjectName : "None";
-                        var workproduct = task.get('WorkProduct');
+                        var workproduct = artifactFid + ', ScheduleState: ' + artifactState;
                         
                         result = {
                                     "_ref"          : taskRef,
-                                    "ObjectID"      : taskOid,
                                     "FormattedID"   : taskFid,
                                     "Name"          : taskName,
                                     "Estimate"      : taskEstimate,
                                     "Actuals"       : taskActuals,
-                                    //"TimeSpent"     : taskTimespent,
-                                    "State"         : taskState,
                                     "Blocked"       : blocked,
-                                    "WorkProduct"   : workproduct,
+                                    "State"         : taskState,
                                     "ScheduleState" : artifactState,
                                     "Owner"         : taskOwner,
-                                    "WorkproductID" : artifactFid
+                                    "WorkproductID" : artifactFid,
+                                    "Workproduct"   : workproduct
                                 };
                         deferred.resolve(result);    
                     }
@@ -178,14 +140,13 @@ Ext.define('CustomApp', {
         }
         var gridStore = Ext.create('Rally.data.custom.Store', {
             data: that._tasks,
-            groupField: 'WorkproductID',
+            groupField: 'Workproduct',
             limit: Infinity
         });
         that._grid = Ext.create('Rally.ui.grid.Grid', {
             itemId: 'taskGrid',
             store: gridStore,
             features: [{ftype:'groupingsummary'}],
-            //enableBlockedReasonPopover: false,
             minHeight: 500,
             columnCfgs: [
                 {
@@ -196,7 +157,7 @@ Ext.define('CustomApp', {
                 {
                     text: 'Name', dataIndex: 'Name',
                     summaryRenderer: function() {
-                        return "Totals"; 
+                        return "Totals:"; 
                     }
                 },
                 {
@@ -207,12 +168,8 @@ Ext.define('CustomApp', {
                     text: 'Actuals', dataIndex: 'Actuals',
                     summaryType: 'sum'
                 },
-                //{
-                //    text: 'TimeSpent', dataIndex: 'TimeSpent',
-                //    summaryType: 'sum'
-                //},
                 {
-                    text: 'Task State', dataIndex: 'State',xtype: 'templatecolumn',
+                    text: 'State', dataIndex: 'State',xtype: 'templatecolumn',
                         tpl: Ext.create('Rally.ui.renderer.template.ScheduleStateTemplate',
                             {
                                 states: that._allowedStates,
@@ -222,26 +179,7 @@ Ext.define('CustomApp', {
                         })
                 },
                 {
-                    text: 'Blocked', dataIndex: 'Blocked'
-                },
-                {
-                    text: 'Task Owner', dataIndex: 'Owner'
-                },
-                {
-                    text: 'WorkProduct', dataIndex: 'WorkProduct',
-                    renderer: function(val, meta, record) {
-                        return '<a href="' + Rally.nav.Manager.getDetailUrl(record.get('WorkProduct')) + '">' + record.get('WorkProduct').FormattedID + '</a>';
-                    }
-                },
-                {
-                    text: 'ScheduleState', dataIndex: 'ScheduleState',xtype: 'templatecolumn',
-                        tpl: Ext.create('Rally.ui.renderer.template.ScheduleStateTemplate',
-                            {
-                                states: that._allowedScheduleStates,
-                                field: {
-                                    name: 'ScheduleState' 
-                                }
-                        })
+                    text: 'Owner', dataIndex: 'Owner'
                 }
             ]
         });
