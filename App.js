@@ -20,7 +20,6 @@ Ext.define('CustomApp', {
     },
     
     _getTaskModel:function(){
-        console.log(this._allowedScheduleStates);
         return Rally.data.ModelFactory.getModel({
             type:'Task'
         });
@@ -49,7 +48,6 @@ Ext.define('CustomApp', {
     
     _makeStore:function(allowedStates){
         this._allowedStates = allowedStates;
-        console.log(this._allowedStates);
         Ext.create('Rally.data.wsapi.Store', {
                 model: 'Task',
                 fetch: ['ObjectID', 'FormattedID', 'Name', 'State', 'Owner', 'WorkProduct', 'Estimate', 'Actuals','Blocked','ScheduleState'],
@@ -78,7 +76,6 @@ Ext.define('CustomApp', {
 
             Deft.Promise.all(promises).then({
                 success: function(results) {
-                    console.log('results', results);
                     that._tasks = results;
                     that._makeGrid();
                 }
@@ -87,12 +84,10 @@ Ext.define('CustomApp', {
         
     },
     _getWorkproduct: function(task, scope) {
-        console.log('task', task);
         var that = scope;
         var deferred = Ext.create('Deft.Deferred');
         var artifactOid = task.get('WorkProduct').ObjectID;
         var artifactType = task.get('WorkProduct')._type;
-        console.log('artifactType', artifactType);
         Rally.data.ModelFactory.getModel({
             type: artifactType,
             scope: this,
@@ -134,7 +129,6 @@ Ext.define('CustomApp', {
     },
     _makeGrid: function() {
         var that = this;
-        console.log(that._tasks);
         if (that._grid) {
             that._grid.destroy();
         }
