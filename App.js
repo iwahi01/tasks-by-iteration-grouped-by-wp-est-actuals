@@ -2,29 +2,93 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.TimeboxScopedApp',
     componentCls: 'app',
     scopeType: 'iteration',
+    _allowedScheduleStates:[],
+    _allowedStates:[],
     comboboxConfig: {
         fieldLabel: 'Select iteration:',
         labelWidth: 100,
         width: 300
     },
     onScopeChange: function() {
-        this._makeStore();
+        this._getDefectModel().then({
+            success: this._getScheduleStateAllowedValues,
+            scope:this
+        }).then({
+            success: this._getTaskModel,
+            scope:this
+        }).then ({
+            success: this._getStateAllowedValues,
+            scope:this
+        }).then({
+            success:this._makeStore,
+            scope:this
+         });
     },
-    _makeStore:function(){
-        var filter = Ext.create('Rally.data.wsapi.Filter',
-            {   
-                property: 'State',
-                operator: '>=',
-                value: 'Defined'
-            });
-        filter= filter.and(this.getContext().getTimeboxScope().getQueryFilter());
-        filter.toString();
+    
+    _getDefectModel:function(){
+        return Rally.data.ModelFactory.getModel({
+            type:'Defect'
+        });
+    },
+    
+    _getTaskModel:function(allowedScheduleStates){
+        this._allowedScheduleStates = allowedScheduleStates;
+        console.log(this._allowedScheduleStates);
+        return Rally.data.ModelFactory.getModel({
+            type:'Task'
+        });
+    },
+    
+    _getScheduleStateAllowedValues:function(model){
+        var deferred = Ext.create('Deft.Deferred');
+        var allowedScheduleStateValues = [];
+        model.getField('ScheduleState').getAllowedValueStore().load({
+            callback: function(records,operation,success){
+                Ext.Array.each(records,function(allowedValue){
+                    allowedScheduleStateValues.push(allowedValue.get('StringValue'));
+                });
+                if(success){
+                    deferred.resolve(allowedScheduleStateValues);
+                }
+                else{
+                    deferred.reject();
+                }
+
+            }
+        }) ;
+        return deferred.promise;
         
+    },
+    
+    _getStateAllowedValues:function(model){
+        var deferred = Ext.create('Deft.Deferred');
+        var allowedStateValues = [];
+        model.getField('State').getAllowedValueStore().load({
+            callback: function(records,operation,success){
+                Ext.Array.each(records,function(allowedValue){
+                    allowedStateValues.push(allowedValue.get('StringValue'));
+                });
+                if(success){
+                    deferred.resolve(allowedStateValues);
+                }
+                else{
+                    deferred.reject();
+                }
+
+            }
+        }) ;
+        return deferred.promise;
+        
+    },
+    
+    _makeStore:function(allowedStates){
+        this._allowedStates = allowedStates;
+        console.log(this._allowedStates);
         Ext.create('Rally.data.wsapi.Store', {
                 model: 'Task',
-                fetch: ['ObjectID', 'FormattedID', 'Name', 'State', 'Owner', 'WorkProduct', 'Estimate', 'Actuals', 'Blocked','Project','ScheduleState'],
+                fetch: ['ObjectID', 'FormattedID', 'Name', 'State', 'Owner', 'WorkProduct', 'Estimate', 'Actuals', 'TimeSpent','Blocked','Project','ScheduleState'],
                 autoLoad: true,
-                filters: [filter],
+                filters: this.getContext().getTimeboxScope().getQueryFilter(),
                 listeners: {
                     load: this._onDataLoaded,
                     scope: this
@@ -77,6 +141,7 @@ Ext.define('CustomApp', {
                         var taskFid     = task.get('FormattedID');
                         var taskEstimate = task.get('Estimate');
                         var taskActuals = task.get('Actuals');
+                        //var taskTimespent = task.get('TimeSpent');
                         var taskName    = task.get('Name');
                         var blocked     = task.get('Blocked');
                         var taskState   = task.get('State');
@@ -90,6 +155,7 @@ Ext.define('CustomApp', {
                                     "Name"          : taskName,
                                     "Estimate"      : taskEstimate,
                                     "Actuals"       : taskActuals,
+                                    //"TimeSpent"     : taskTimespent,
                                     "State"         : taskState,
                                     "Blocked"       : blocked,
                                     "WorkProduct"   : workproduct,
@@ -141,8 +207,19 @@ Ext.define('CustomApp', {
                     text: 'Actuals', dataIndex: 'Actuals',
                     summaryType: 'sum'
                 },
+                //{
+                //    text: 'TimeSpent', dataIndex: 'TimeSpent',
+                //    summaryType: 'sum'
+                //},
                 {
-                    text: 'Task State', dataIndex: 'State'
+                    text: 'Task State', dataIndex: 'State',xtype: 'templatecolumn',
+                        tpl: Ext.create('Rally.ui.renderer.template.ScheduleStateTemplate',
+                            {
+                                states: that._allowedStates,
+                                field: {
+                                    name: 'State' 
+                                }
+                        })
                 },
                 {
                     text: 'Blocked', dataIndex: 'Blocked'
@@ -157,7 +234,14 @@ Ext.define('CustomApp', {
                     }
                 },
                 {
-                    text: 'ScheduleState', dataIndex: 'ScheduleState'
+                    text: 'ScheduleState', dataIndex: 'ScheduleState',xtype: 'templatecolumn',
+                        tpl: Ext.create('Rally.ui.renderer.template.ScheduleStateTemplate',
+                            {
+                                states: that._allowedScheduleStates,
+                                field: {
+                                    name: 'ScheduleState' 
+                                }
+                        })
                 }
             ]
         });
