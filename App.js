@@ -95,12 +95,21 @@ Ext.define('CustomApp', {
                 model.load(artifactOid,{
                     scope: this,
                     success: function(record, operation) {
+                        var difference;
+                        var taskEstimate = task.get('Estimate');
+                        var taskActuals = task.get('Actuals');
                         var artifactState = record.get('ScheduleState');
                         var artifactFid = record.get('FormattedID');
                         var taskRef     = task.get('_ref');
                         var taskFid     = task.get('FormattedID');
-                        var taskEstimate = task.get('Estimate');
-                        var taskActuals = task.get('Actuals');
+                        
+                        if (taskActuals === null)  {
+                            difference = 0;    
+                        }
+                        else{
+                            difference = taskActuals - taskEstimate;
+                        }
+
                         var blocked = task.get('Blocked');
                         var taskName    = task.get('Name');
                         var taskState   = task.get('State');
@@ -113,12 +122,14 @@ Ext.define('CustomApp', {
                                     "Name"          : taskName,
                                     "Estimate"      : taskEstimate,
                                     "Actuals"       : taskActuals,
+                                    "Difference"    : difference,
                                     "Blocked"       : blocked,
                                     "State"         : taskState,
                                     "ScheduleState" : artifactState,
                                     "Owner"         : taskOwner,
                                     "WorkproductID" : artifactFid,
                                     "Workproduct"   : workproduct
+                                    
                                 };
                         deferred.resolve(result);    
                     }
@@ -155,11 +166,23 @@ Ext.define('CustomApp', {
                     }
                 },
                 {
-                    text: 'Estimate', dataIndex: 'Estimate',
+                    text: 'Estimate', dataIndex: 'Estimate', 
                     summaryType: 'sum'
                 },
                 {
                     text: 'Actuals', dataIndex: 'Actuals',
+                    summaryType: 'sum'
+                },
+                {
+                    text: 'E - A', dataIndex: 'Difference',
+                        renderer: function(value){
+                            if (value > 0) {
+                                return '<span style="color:red;">' + value + '</span>'
+                            }
+                            else{
+                                return '<span style="color:black;">' + value + '</span>'
+                            }
+                        },
                     summaryType: 'sum'
                 },
                 {
