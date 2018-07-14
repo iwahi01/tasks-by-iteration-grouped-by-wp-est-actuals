@@ -59,7 +59,7 @@
         this._allowedStates = allowedStates;
         Ext.create('Rally.data.wsapi.Store', {
                 model: 'Task',
-                fetch: ['ObjectID', 'FormattedID', 'Name', 'State', 'Owner', 'WorkProduct', 'Estimate', 'Actuals','Blocked','ScheduleState'],
+                fetch: ['ObjectID', 'FormattedID', 'Name', 'State', 'Owner', 'WorkProduct', 'Estimate', 'Actuals','Blocked','ScheduleState', 'Lines'],
                 autoLoad: true,
                 filters: this.getContext().getTimeboxScope().getQueryFilter(),
                 listeners: {
@@ -105,6 +105,7 @@
                     scope: this,
                     success: function(record, operation) {
                         var difference;
+			var lines = task.get('Lines');
                         var taskEstimate = task.get('Estimate');
                         var taskActuals = task.get('Actuals');
                         var artifactState = record.get('ScheduleState');
@@ -132,6 +133,7 @@
                                     "Estimate"      : taskEstimate,
                                     "Actuals"       : taskActuals,
                                     "Difference"    : difference,
+                                    "Lines"         : lines,
                                     "Blocked"       : blocked,
                                     "State"         : taskState,
                                     "ScheduleState" : artifactState,
@@ -192,6 +194,10 @@
                                 return '<span style="color:black;">' + value + '</span>'
                             }
                         },
+                    summaryType: 'sum'
+                },
+                {
+                    text: 'Lines', dataIndex: 'Lines',
                     summaryType: 'sum'
                 },
                 {
